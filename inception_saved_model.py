@@ -8,6 +8,8 @@ from tensorflow.python.saved_model import tag_constants
 from tensorflow.python.saved_model import utils
 from tensorflow.python.util import compat
 from inception import inception_model
+from utils import load_graph
+from models import facenet
 
 tf.app.flags.DEFINE_string('checkpoint_dir', '/tmp/inception_train',
                            """Directory where to read training checkpoints.""")
@@ -29,6 +31,7 @@ WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 def export():
+  # graph = load_graph('./model_check_point/20170216-091149/freeze_model.pb')
   with tf.Graph().as_default():
     # Step: One
     # Input transformation.
@@ -41,23 +44,36 @@ def export():
 
     # Restore variables from training checkpoint.
     # Step: Two
-    variable_averages = tf.train.ExponentialMovingAverage(
-        inception_model.MOVING_AVERAGE_DECAY)
-    variables_to_restore = variable_averages.variables_to_restore()
+    #variable_averages = tf.train.ExponentialMovingAverage(
+    #    inception_model.MOVING_AVERAGE_DECAY)
+    #variables_to_restore = variable_averages.variables_to_restore()
 
-    saver = tf.train.Saver(variables_to_restore)
+    #saver = tf.train.Saver(variables_to_restore)
+    model_dir = "./model_check_point/20170216-091149"
+    print('Model directory: %s' % model_dir)
+    meta_file, ckpt_file = facenet.get_model_filenames(os.path.expanduser(model_dir))
+            
+    print('Metagraph file: %s' % meta_file)
+    print('Checkpoint file: %s' % ckpt_file)
+
     with tf.Session() as sess:
+      model_dir_exp = os.path.expanduser(model_dir)
+      saver = tf.train.import_meta_graph(os.path.join(model_dir_exp, meta_file), clear_devices=True)
+      tf.get_default_session().run(tf.global_variables_initializer())
+      tf.get_default_session().run(tf.local_variables_initializer())
+      saver.restore(tf.get_default_session(), os.path.join(model_dir_exp, ckpt_file))
+
+
+    #with tf.Session() as sess:
      # setf.InteractiveSession() 
      # Restore variables from training checkpoints.
-      ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
-      if ckpt and ckpt.model_checkpoint_path:
-        saver.restore(sess, ckpt.model_checkpoint_path)
-        global_step = ckpt.model_checkpoint_path.split('/')[-1].split('-')[-1]
-        print 'Successfully loaded model from %s at step=%s.' % (
-            ckpt.model_checkpoint_path, global_step)
-      output_path = os.path.join(
-          compat.as_bytes(FLAGS.output_dir),
-          compat.as_bytes(str(FLAGS.model_version)))
+    #  ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
+    #  if ckpt and ckpt.model_checkpoint_path:
+    #    saver.restore(sess, ckpt.model_checkpoint_path)
+    #    global_step = ckpt.model_checkpoint_path.split('/')[-1].split('-')[-1]
+    #    print 'Successfully loaded model from %s at step=%s.' % (
+    #        ckpt.model_checkpoint_path, global_step)
+      output_path = os.path.join(compat.as_bytes(FLAGS.output_dir),compat.as_bytes(str(FLAGS.model_version)))
       print 'Exporting trained model to', output_path
       builder = saved_model_builder.SavedModelBuilder(output_path)
 
